@@ -32,8 +32,9 @@ pub use account::{
     AccountStorageUsageForMedia, FamilyMember,
 };
 pub use auth::{
-    AccountBootstrap, AuthState, AuthenticatedSession, ChallengeHeaders, ClientStateSnapshot,
-    Credentials, EstablishedSession, PendingTwoFactorAuth, SessionSeed,
+    AccountBootstrap, AuthDeliveryOption, AuthState, AuthStatus, AuthenticatedSession,
+    ChallengeHeaders, ClientStateSnapshot, Credentials, EstablishedSession, LegacyTrustedDevice,
+    PendingAuthStatus, PendingTwoFactorAuth, SessionSeed, TrustedPhoneNumber, TrustedPhoneNumberId,
 };
 pub use calendar::{CalendarAttendee, CalendarEvent, CalendarEventDetail, CalendarEventsResponse};
 pub use contacts::{ContactCard, ContactEmail, ContactPhone, ContactsPage, ContactsStartup};

@@ -10,6 +10,12 @@ include = ["Cargo.toml", "src/**/*"]
 
 [features]
 default = ["std"]
+serde = [
+  "dep:serde",
+  "secrecy/serde",
+  "time/serde",
+  "url/serde",
+]
 std = [
   "nojson/std",
   "thiserror/std",
@@ -28,6 +34,7 @@ cookie = { workspace = true, optional = true }
 http = { workspace = true, optional = true }
 nojson.workspace = true
 secrecy.workspace = true
+serde = { workspace = true, optional = true }
 thiserror.workspace = true
 time.workspace = true
 url.workspace = true

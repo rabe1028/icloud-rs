@@ -47,19 +47,21 @@ use icloud_protocol::{
     parse_calendar_events, parse_contacts_page, parse_contacts_startup, parse_drive_app_libraries,
     parse_drive_container, parse_drive_container_with_seed, parse_drive_download,
     parse_drive_upload_receipt, parse_drive_upload_ticket, parse_family_members,
-    parse_findmy_devices, parse_photo_album_count, parse_photo_album_folders,
-    parse_photo_album_page, parse_photo_albums, parse_photo_library_state, parse_reminders,
-    parse_sign_in_response, parse_ubiquity_children, parse_ubiquity_folder, parse_ubiquity_node,
+    parse_findmy_devices, parse_legacy_trusted_devices, parse_photo_album_count,
+    parse_photo_album_folders, parse_photo_album_page, parse_photo_albums,
+    parse_photo_library_state, parse_reminders, parse_sign_in_response, parse_ubiquity_children,
+    parse_ubiquity_folder, parse_ubiquity_node,
 };
 use icloud_types::{
-    AccountDevice, AccountMemberPhoto, AccountStorage, AuthState, AuthenticatedSession,
+    AccountDevice, AccountMemberPhoto, AccountStorage, AuthState, AuthStatus, AuthenticatedSession,
     CalendarEventDetail, CalendarEventsResponse, ClientContext, ClientIdentity,
     ClientStateSnapshot, ContactCard, ContactsPage, ContactsStartup, CookieJar, Credentials,
     DriveContainer, DriveContainerContents, DriveDownload, DriveFile, DriveNode, DriveUploadFile,
     FamilyMember, FindMyDevice, FindMyDevicesResponse, FindMyLocation, FindMyLostModeCommand,
-    FindMyMessageCommand, FindMyRefreshOptions, FindMySoundCommand, ICloudError, PhotoAlbumPage,
-    PhotoAlbumSummary, PhotoAsset, PhotoAssetVersionKind, PhotoLibraryState, ReminderList,
-    RemindersResponse, ServiceId, UbiquityFile, UbiquityFolder, UbiquityNode, UbiquityNodeId,
+    FindMyMessageCommand, FindMyRefreshOptions, FindMySoundCommand, ICloudError, JsonValue,
+    LegacyTrustedDevice, PhotoAlbumPage, PhotoAlbumSummary, PhotoAsset, PhotoAssetVersionKind,
+    PhotoLibraryState, ReminderList, RemindersResponse, ServiceId, TrustedPhoneNumber,
+    UbiquityFile, UbiquityFolder, UbiquityNode, UbiquityNodeId,
 };
 
 pub use error::ClientError;
@@ -252,12 +254,17 @@ macro_rules! impl_common_methods {
         {
             /// Captures the current typed client state.
             ///
-            /// The core crates intentionally do not provide snapshot persistence or a
-            /// serialization format. Applications should decide how to encode,
-            /// encrypt, and store this value.
+            /// Snapshots contain cookies and authentication secrets. Enable the
+            /// `serde` feature to encode them directly; encryption at rest remains
+            /// the caller's responsibility.
             #[must_use]
             pub fn snapshot(&self) -> ClientStateSnapshot {
                 self.core.snapshot()
+            }
+
+            #[must_use]
+            pub fn auth_status(&self) -> AuthStatus {
+                self.core.state.snapshot().status()
             }
 
             #[must_use]
@@ -343,6 +350,30 @@ impl<T> $client<T, PendingTwoFactor>
 where
     T: $transport,
 {
+    #[must_use]
+    pub fn trusted_phone_numbers(&self) -> &[TrustedPhoneNumber] {
+        self.core.state.pending.trusted_phone_numbers.as_slice()
+    }
+
+    #[must_use]
+    pub fn has_trusted_devices(&self) -> bool {
+        self.core.state.pending.has_trusted_devices
+    }
+
+    pub $($a)* fn request_sms_verification_code(
+        &mut self,
+        phone_number: &TrustedPhoneNumber,
+    ) -> Result<(), ClientError<T::Error>> {
+        let request = {
+            let protocol = AuthProtocol::new(&self.core.context, &self.core.identity);
+            protocol.request_sms_code(&self.core.state.pending, phone_number)?
+        };
+        let response = $exec(&mut self.core, request) $($w)* ?;
+        response.ensure_success()?;
+        merge_pending_two_factor_response(&mut self.core.state.pending, &response)?;
+        Ok(())
+    }
+
     pub $($a)* fn submit_trusted_device_code(
         mut self,
         code: &str,
@@ -352,6 +383,37 @@ where
         let verify_request = {
             let protocol = AuthProtocol::new(&self.core.context, &self.core.identity);
             protocol.verify_trusted_device_code(&pending, code)?
+        };
+        let verify_response = $exec(&mut self.core, verify_request) $($w)* ?;
+        verify_response.ensure_success()?;
+        merge_pending_two_factor_response(&mut pending, &verify_response)?;
+
+        let trust_request = {
+            let protocol = AuthProtocol::new(&self.core.context, &self.core.identity);
+            protocol.trust_session(&pending)?
+        };
+        let trust_response = $exec(&mut self.core, trust_request) $($w)* ?;
+        trust_response.ensure_success()?;
+        merge_pending_two_factor_response(&mut pending, &trust_response)?;
+
+        let session = pending
+            .seed
+            .try_into_established(Some(pending.challenge.clone()))?;
+        Ok($client {
+            core: self.core.transition(AuthenticatedPreBootstrap { session }),
+        })
+    }
+
+    pub $($a)* fn submit_sms_verification_code(
+        mut self,
+        phone_number: &TrustedPhoneNumber,
+        code: &str,
+    ) -> Result<$client<T, AuthenticatedPreBootstrap>, ClientError<T::Error>> {
+        let mut pending = self.core.state.pending.clone();
+
+        let verify_request = {
+            let protocol = AuthProtocol::new(&self.core.context, &self.core.identity);
+            protocol.verify_sms_code(&pending, phone_number, code)?
         };
         let verify_response = $exec(&mut self.core, verify_request) $($w)* ?;
         verify_response.ensure_success()?;
@@ -452,6 +514,45 @@ macro_rules! impl_authenticated_methods {
         };
         let response = $exec(&mut self.core, request) $($w)* ?;
         self.core.state.session.bootstrap = parse_account_bootstrap(&response)?;
+        Ok(())
+    }
+
+    pub $($a)* fn legacy_trusted_devices(
+        &mut self,
+    ) -> Result<Vec<LegacyTrustedDevice>, ClientError<T::Error>> {
+        let request = {
+            let protocol = AuthProtocol::new(&self.core.context, &self.core.identity);
+            protocol.legacy_trusted_devices(self.core.dsid())?
+        };
+        let response = $exec(&mut self.core, request) $($w)* ?;
+        Ok(parse_legacy_trusted_devices(&response)?)
+    }
+
+    pub $($a)* fn request_legacy_verification_code(
+        &mut self,
+        device: &LegacyTrustedDevice,
+    ) -> Result<bool, ClientError<T::Error>> {
+        let request = {
+            let protocol = AuthProtocol::new(&self.core.context, &self.core.identity);
+            protocol.send_legacy_verification_code(self.core.dsid(), device)?
+        };
+        let response = $exec(&mut self.core, request) $($w)* ?;
+        response.ensure_success()?;
+        Ok(response_success_flag(&response).unwrap_or(true))
+    }
+
+    pub $($a)* fn submit_legacy_verification_code(
+        &mut self,
+        device: &LegacyTrustedDevice,
+        code: &str,
+    ) -> Result<(), ClientError<T::Error>> {
+        let request = {
+            let protocol = AuthProtocol::new(&self.core.context, &self.core.identity);
+            protocol.validate_legacy_verification_code(self.core.dsid(), device, code)?
+        };
+        let response = $exec(&mut self.core, request) $($w)* ?;
+        response.ensure_success()?;
+        self.refresh_session() $($w)* ?;
         Ok(())
     }
 
@@ -1021,6 +1122,13 @@ impl<T, S> ClientCore<T, S> {
         }
         Ok(())
     }
+}
+
+fn response_success_flag(response: &ResponseParts) -> Option<bool> {
+    let JsonValue::Object(payload) = response.json_value().ok()? else {
+        return None;
+    };
+    payload.get("success").and_then(JsonValue::as_bool)
 }
 
 impl<T> ClientCore<T, Authenticated> {

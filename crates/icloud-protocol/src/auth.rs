@@ -8,8 +8,9 @@ use secrecy::{ExposeSecret, SecretString};
 
 use icloud_types::{
     AccountBootstrap, ChallengeHeaders, ClientContext, ClientIdentity, Credentials,
-    EstablishedSession, ICloudError, PendingTwoFactorAuth, ServiceId, ServiceStatus, SessionSeed,
-    WebService, WebServiceMap,
+    EstablishedSession, ICloudError, JsonObject, JsonValue, LegacyTrustedDevice,
+    PendingTwoFactorAuth, ServiceId, ServiceStatus, SessionSeed, TrustedPhoneNumber,
+    TrustedPhoneNumberId, WebService, WebServiceMap,
 };
 
 use crate::{RequestSpec, ResponseParts};
@@ -97,6 +98,50 @@ impl<'a> AuthProtocol<'a> {
         Ok(request)
     }
 
+    pub fn request_sms_code(
+        &self,
+        pending: &PendingTwoFactorAuth,
+        phone_number: &TrustedPhoneNumber,
+    ) -> Result<RequestSpec, ICloudError> {
+        let mut request = RequestSpec::new(Method::Put, self.context.auth_url("verify/phone")?);
+        request.headers = self.auth_headers()?;
+        add_challenge_headers(&mut request.headers, &pending.challenge)?;
+        request.insert_header(ACCEPT, HeaderValue::from_static("application/json"));
+        request = request.with_json_body(format!(
+            "{{{},\"mode\":\"sms\"}}",
+            phone_number_member(phone_number)
+        ))?;
+        Ok(request)
+    }
+
+    pub fn verify_sms_code(
+        &self,
+        pending: &PendingTwoFactorAuth,
+        phone_number: &TrustedPhoneNumber,
+        code: &str,
+    ) -> Result<RequestSpec, ICloudError> {
+        let mut request = RequestSpec::new(
+            Method::Post,
+            self.context.auth_url("verify/phone/securitycode")?,
+        );
+        request.headers = self.auth_headers()?;
+        add_challenge_headers(&mut request.headers, &pending.challenge)?;
+        request.insert_header(
+            ACCEPT,
+            HeaderValue::from_static("application/json, text/plain"),
+        );
+        request = request.with_json_body(format!(
+            "{{{},{},\"mode\":{}}}",
+            phone_number_member(phone_number),
+            crate::json::member(
+                "securityCode",
+                format!("{{{}}}", crate::json::string_member("code", code))
+            ),
+            crate::json::quote(phone_number.push_mode.as_deref().unwrap_or("sms"))
+        ))?;
+        Ok(request)
+    }
+
     pub fn trust_session(
         &self,
         pending: &PendingTwoFactorAuth,
@@ -104,6 +149,51 @@ impl<'a> AuthProtocol<'a> {
         let mut request = RequestSpec::new(Method::Get, self.context.auth_url("2sv/trust")?);
         request.headers = self.auth_headers()?;
         add_challenge_headers(&mut request.headers, &pending.challenge)?;
+        Ok(request)
+    }
+
+    pub fn legacy_trusted_devices(&self, dsid: &str) -> Result<RequestSpec, ICloudError> {
+        let mut request = RequestSpec::new(Method::Get, self.context.setup_url("listDevices")?);
+        request.headers = self.setup_headers()?;
+        request.url.query_pairs_mut().append_pair("dsid", dsid);
+        Ok(request)
+    }
+
+    pub fn send_legacy_verification_code(
+        &self,
+        dsid: &str,
+        device: &LegacyTrustedDevice,
+    ) -> Result<RequestSpec, ICloudError> {
+        let mut request = RequestSpec::new(
+            Method::Post,
+            self.context.setup_url("sendVerificationCode")?,
+        );
+        request.headers = self.setup_headers()?;
+        request.url.query_pairs_mut().append_pair("dsid", dsid);
+        request = request.with_json_body(crate::json::render_object(&device.raw))?;
+        Ok(request)
+    }
+
+    pub fn validate_legacy_verification_code(
+        &self,
+        dsid: &str,
+        device: &LegacyTrustedDevice,
+        code: &str,
+    ) -> Result<RequestSpec, ICloudError> {
+        let mut payload = device.raw.clone();
+        payload.insert(
+            "verificationCode".to_owned(),
+            JsonValue::String(code.to_owned()),
+        );
+        payload.insert("trustBrowser".to_owned(), JsonValue::Bool(true));
+
+        let mut request = RequestSpec::new(
+            Method::Post,
+            self.context.setup_url("validateVerificationCode")?,
+        );
+        request.headers = self.setup_headers()?;
+        request.url.query_pairs_mut().append_pair("dsid", dsid);
+        request = request.with_json_body(crate::json::render_object(&payload))?;
         Ok(request)
     }
 
@@ -235,12 +325,37 @@ pub fn parse_sign_in_response(
                 apple_id: apple_id.to_owned(),
                 challenge,
                 seed: parse_session_seed(response)?,
+                trusted_phone_numbers: parse_pending_trusted_phone_numbers(response),
+                has_trusted_devices: parse_pending_has_trusted_devices(response),
             }))
         }
         _ => Err(ICloudError::UnexpectedStatus {
             status: response.status.as_u16(),
         }),
     }
+}
+
+pub fn parse_legacy_trusted_devices(
+    response: &ResponseParts,
+) -> Result<Vec<LegacyTrustedDevice>, ICloudError> {
+    let payload = crate::json::object(response)?;
+    let Some(JsonValue::Array(devices)) = payload.get("devices") else {
+        return crate::json::invalid("missing trusted devices");
+    };
+
+    devices
+        .iter()
+        .map(|device| {
+            let JsonValue::Object(raw) = device else {
+                return crate::json::invalid("trusted device entry was not an object");
+            };
+            Ok(LegacyTrustedDevice {
+                device_name: crate::json::string_field(raw, "deviceName"),
+                phone_number: crate::json::string_field(raw, "phoneNumber"),
+                raw: raw.clone(),
+            })
+        })
+        .collect()
 }
 
 pub fn parse_session_seed(response: &ResponseParts) -> Result<SessionSeed, ICloudError> {
@@ -311,6 +426,88 @@ pub fn parse_account_bootstrap(response: &ResponseParts) -> Result<AccountBootst
         account_name: crate::json::string_field(&payload, "accountName"),
         webservices,
     })
+}
+
+fn parse_pending_payload(response: &ResponseParts) -> Option<JsonObject> {
+    match response.json_value().ok()? {
+        JsonValue::Object(value) => Some(value),
+        _ => None,
+    }
+}
+
+fn parse_pending_has_trusted_devices(response: &ResponseParts) -> bool {
+    parse_pending_payload(response)
+        .as_ref()
+        .and_then(|payload| crate::json::bool_field(payload, "hasTrustedDevices"))
+        .unwrap_or(true)
+}
+
+fn parse_pending_trusted_phone_numbers(response: &ResponseParts) -> Vec<TrustedPhoneNumber> {
+    let Some(payload) = parse_pending_payload(response) else {
+        return Vec::new();
+    };
+
+    let mut phones = Vec::new();
+    push_phone_from_object(&mut phones, &payload, "trustedPhoneNumber");
+
+    if let Some(JsonValue::Object(verification)) = payload.get("phoneNumberVerification") {
+        push_phone_from_object(&mut phones, verification, "trustedPhoneNumber");
+        if let Some(JsonValue::Array(values)) = verification.get("trustedPhoneNumbers") {
+            phones.extend(values.iter().filter_map(trusted_phone_number_from_value));
+        }
+    }
+
+    if let Some(JsonValue::Array(values)) = payload.get("trustedPhoneNumbers") {
+        phones.extend(values.iter().filter_map(trusted_phone_number_from_value));
+    }
+
+    phones.dedup_by(|left, right| left.id == right.id);
+    phones
+}
+
+fn push_phone_from_object(phones: &mut Vec<TrustedPhoneNumber>, raw: &JsonObject, field: &str) {
+    if let Some(phone) = raw.get(field).and_then(trusted_phone_number_from_value) {
+        phones.push(phone);
+    }
+}
+
+fn trusted_phone_number_from_value(value: &JsonValue) -> Option<TrustedPhoneNumber> {
+    let JsonValue::Object(raw) = value else {
+        return None;
+    };
+    let id = match raw.get("id")? {
+        JsonValue::Number(value) => value.as_u64().map(TrustedPhoneNumberId::Number)?,
+        JsonValue::String(value) => TrustedPhoneNumberId::String(value.clone()),
+        _ => return None,
+    };
+
+    Some(TrustedPhoneNumber {
+        id,
+        push_mode: crate::json::string_field(raw, "pushMode"),
+        non_fteu: crate::json::bool_field(raw, "nonFTEU"),
+        obfuscated_number: crate::json::string_field(raw, "obfuscatedNumber")
+            .or_else(|| crate::json::string_field(raw, "obfuscatedPhoneNumber")),
+        number_with_dial_code: crate::json::string_field(raw, "numberWithDialCode")
+            .or_else(|| crate::json::string_field(raw, "phoneNumber")),
+    })
+}
+
+fn phone_number_member(phone_number: &TrustedPhoneNumber) -> String {
+    crate::json::member("phoneNumber", phone_number_payload(phone_number))
+}
+
+fn phone_number_payload(phone_number: &TrustedPhoneNumber) -> String {
+    let mut fields = vec![crate::json::member(
+        "id",
+        match &phone_number.id {
+            TrustedPhoneNumberId::Number(value) => value.to_string(),
+            TrustedPhoneNumberId::String(value) => crate::json::quote(value),
+        },
+    )];
+    if let Some(non_fteu) = phone_number.non_fteu {
+        fields.push(crate::json::bool_member("nonFTEU", non_fteu));
+    }
+    format!("{{{}}}", fields.join(","))
 }
 
 fn add_challenge_headers(
@@ -477,8 +674,131 @@ mod tests {
                     account_country_code: Some("JPN".to_owned()),
                     trust_token: None,
                 },
+                trusted_phone_numbers: Vec::new(),
+                has_trusted_devices: true,
             }),
         );
+    }
+
+    #[test]
+    fn sign_in_response_extracts_trusted_phone_numbers() {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            HeaderName::from_static(HEADER_SCNT),
+            HeaderValue::from_static("challenge-scnt"),
+        );
+        headers.insert(
+            HeaderName::from_static(HEADER_SESSION_ID),
+            HeaderValue::from_static("session-id"),
+        );
+        headers.insert(
+            HeaderName::from_static(HEADER_SESSION_TOKEN),
+            HeaderValue::from_static("session-token"),
+        );
+        headers.insert(
+            HeaderName::from_static(HEADER_ACCOUNT_COUNTRY),
+            HeaderValue::from_static("JPN"),
+        );
+        let body = br#"{
+            "hasTrustedDevices": false,
+            "phoneNumberVerification": {
+                "trustedPhoneNumbers": [
+                    {
+                        "id": 1,
+                        "pushMode": "sms",
+                        "nonFTEU": true,
+                        "obfuscatedNumber": "+81 ******1234"
+                    }
+                ]
+            }
+        }"#;
+
+        let response = ResponseParts::new(StatusCode::CONFLICT, headers, body.to_vec());
+        let SignInOutcome::PendingTwoFactor(pending) =
+            parse_sign_in_response("person@example.com", &response).expect("response should parse")
+        else {
+            panic!("pending 2fa expected");
+        };
+
+        assert!(!pending.has_trusted_devices);
+        assert_eq!(
+            pending.trusted_phone_numbers,
+            vec![TrustedPhoneNumber {
+                id: TrustedPhoneNumberId::Number(1),
+                push_mode: Some("sms".to_owned()),
+                non_fteu: Some(true),
+                obfuscated_number: Some("+81 ******1234".to_owned()),
+                number_with_dial_code: None,
+            }],
+        );
+    }
+
+    #[test]
+    fn sms_verification_requests_match_apple_contract() {
+        let context = context();
+        let identity = identity();
+        let protocol = AuthProtocol::new(&context, &identity);
+        let pending = PendingTwoFactorAuth {
+            apple_id: "person@example.com".to_owned(),
+            challenge: ChallengeHeaders {
+                scnt: SecretString::from("challenge-scnt".to_owned()),
+                session_id: "session-id".to_owned(),
+            },
+            seed: SessionSeed::default(),
+            trusted_phone_numbers: Vec::new(),
+            has_trusted_devices: true,
+        };
+        let phone = TrustedPhoneNumber {
+            id: TrustedPhoneNumberId::Number(7),
+            push_mode: Some("sms".to_owned()),
+            non_fteu: Some(false),
+            obfuscated_number: None,
+            number_with_dial_code: None,
+        };
+
+        let request = protocol
+            .request_sms_code(&pending, &phone)
+            .expect("sms request should build");
+        assert_eq!(request.method, Method::Put);
+        assert_eq!(
+            request.url.as_str(),
+            "https://idmsa.apple.com/appleauth/auth/verify/phone"
+        );
+        assert_eq!(
+            String::from_utf8(request.body.as_bytes().expect("json body").to_vec())
+                .expect("utf8 body"),
+            r#"{"phoneNumber":{"id":7,"nonFTEU":false},"mode":"sms"}"#,
+        );
+
+        let request = protocol
+            .verify_sms_code(&pending, &phone, "123456")
+            .expect("sms verification should build");
+        assert_eq!(request.method, Method::Post);
+        assert_eq!(
+            request.url.as_str(),
+            "https://idmsa.apple.com/appleauth/auth/verify/phone/securitycode"
+        );
+        assert_eq!(
+            String::from_utf8(request.body.as_bytes().expect("json body").to_vec())
+                .expect("utf8 body"),
+            r#"{"phoneNumber":{"id":7,"nonFTEU":false},"securityCode":{"code":"123456"},"mode":"sms"}"#,
+        );
+    }
+
+    #[test]
+    fn legacy_trusted_devices_keep_raw_payload() {
+        let response = ResponseParts::new(
+            StatusCode::OK,
+            HeaderMap::new(),
+            br#"{"devices":[{"deviceName":"MacBook Pro","id":"device-1","extra":true},{"phoneNumber":"+81 ******1234","id":2}]}"#.to_vec(),
+        );
+
+        let devices = parse_legacy_trusted_devices(&response).expect("devices should parse");
+
+        assert_eq!(devices.len(), 2);
+        assert_eq!(devices[0].display_label(), Some("MacBook Pro"));
+        assert_eq!(devices[1].display_label(), Some("+81 ******1234"));
+        assert_eq!(devices[0].raw["extra"], JsonValue::Bool(true));
     }
 
     #[test]

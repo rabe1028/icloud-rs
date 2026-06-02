@@ -102,6 +102,25 @@ fn pending_sign_in_response() -> ResponseParts {
     ResponseParts::new(StatusCode::CONFLICT, headers, Vec::new())
 }
 
+fn pending_sign_in_response_with_phone() -> ResponseParts {
+    let mut response = pending_sign_in_response();
+    response.body = br#"{
+        "hasTrustedDevices": true,
+        "phoneNumberVerification": {
+            "trustedPhoneNumbers": [
+                {
+                    "id": 7,
+                    "pushMode": "sms",
+                    "nonFTEU": false,
+                    "obfuscatedNumber": "+81 ******1234"
+                }
+            ]
+        }
+    }"#
+    .to_vec();
+    response
+}
+
 fn trust_response() -> ResponseParts {
     let mut headers = HeaderMap::new();
     headers.insert(
@@ -155,6 +174,15 @@ fn account_login_response() -> ResponseParts {
         StatusCode::OK,
         HeaderMap::new(),
         include_bytes!("../tests/fixtures/auth/account_login_success.json").to_vec(),
+    )
+}
+
+fn legacy_trusted_devices_response() -> ResponseParts {
+    ResponseParts::new(
+        StatusCode::OK,
+        HeaderMap::new(),
+        br#"{"devices":[{"deviceName":"MacBook Pro","id":"device-1"},{"phoneNumber":"+81 ******1234","id":2}]}"#
+            .to_vec(),
     )
 }
 
@@ -416,6 +444,62 @@ async fn async_client_transitions_through_auth_states() {
 }
 
 #[test]
+fn blocking_client_completes_sms_two_factor_flow() {
+    let transport = MockBlockingTransport::with_responses(vec![
+        pending_sign_in_response_with_phone(),
+        ResponseParts::new(StatusCode::OK, HeaderMap::new(), Vec::new()),
+        ResponseParts::new(StatusCode::OK, HeaderMap::new(), Vec::new()),
+        trust_response(),
+    ]);
+    let client = BlockingICloudClient::new(
+        context(),
+        ClientIdentity::new("auth-test-client"),
+        transport.clone(),
+    );
+
+    let mut pending = match client.sign_in(&credentials()).expect("sign in succeeds") {
+        BlockingSignInResult::PendingTwoFactor(client) => client,
+        BlockingSignInResult::Authenticated(_) => panic!("challenge expected"),
+    };
+    assert_eq!(pending.has_trusted_devices(), true);
+    assert_eq!(pending.trusted_phone_numbers().len(), 1);
+    match pending.auth_status() {
+        AuthStatus::PendingAuth(status) => assert_eq!(status.delivery_options.len(), 2),
+        status => panic!("unexpected auth status: {status:?}"),
+    }
+    let phone = pending.trusted_phone_numbers()[0].clone();
+
+    pending
+        .request_sms_verification_code(&phone)
+        .expect("sms request succeeds");
+    let prebootstrap = pending
+        .submit_sms_verification_code(&phone, "123456")
+        .expect("sms challenge completes");
+
+    assert_eq!(
+        prebootstrap
+            .state()
+            .session
+            .trust_token
+            .as_ref()
+            .map(secrecy::ExposeSecret::expose_secret),
+        Some("trust-token"),
+    );
+
+    let requests = transport.requests.lock().expect("requests mutex");
+    assert_eq!(requests[1].method, icloud_protocol::Method::Put);
+    assert_eq!(
+        requests[1].url.as_str(),
+        "https://idmsa.apple.com/appleauth/auth/verify/phone"
+    );
+    assert_eq!(
+        String::from_utf8(requests[2].body.as_bytes().expect("json body").to_vec())
+            .expect("utf8 body"),
+        r#"{"phoneNumber":{"id":7,"nonFTEU":false},"securityCode":{"code":"123456"},"mode":"sms"}"#,
+    );
+}
+
+#[test]
 fn blocking_client_uses_rotated_challenge_headers_for_trust_request() {
     let transport = MockBlockingTransport::with_responses(vec![
         pending_sign_in_response(),
@@ -491,8 +575,44 @@ fn blocking_client_snapshot_preserves_typed_state() {
                 account_country_code: Some("JPN".to_owned()),
                 trust_token: None,
             },
+            trusted_phone_numbers: Vec::new(),
+            has_trusted_devices: true,
         }),
     );
+}
+
+#[cfg(feature = "serde")]
+#[test]
+fn blocking_client_snapshot_serde_round_trips_and_restores() {
+    let snapshot = authenticated_client_with_transport(MockBlockingTransport::default()).snapshot();
+    let encoded = serde_json::to_string(&snapshot).expect("snapshot should serialize");
+    assert!(
+        encoded.contains("session-token"),
+        "encoded snapshots contain secrets and must be encrypted by callers"
+    );
+    let decoded: ClientStateSnapshot =
+        serde_json::from_str(&encoded).expect("snapshot should deserialize");
+
+    let transport = MockBlockingTransport::with_responses(vec![
+        account_login_response(),
+        ResponseParts::new(
+            StatusCode::OK,
+            HeaderMap::new(),
+            include_bytes!("../tests/fixtures/findmy/refresh_client.json").to_vec(),
+        ),
+    ]);
+    let mut client = match BlockingICloudClient::restore(context(), transport, decoded) {
+        RestoredBlockingClient::Authenticated(client) => client,
+        _ => panic!("authenticated snapshot should restore authenticated client"),
+    };
+
+    client
+        .refresh_session()
+        .expect("restored session should validate");
+    let devices = client
+        .refresh_findmy_devices(&FindMyRefreshOptions::default())
+        .expect("restored session should refresh find my");
+    assert_eq!(devices.devices[0].id, "device-1");
 }
 
 #[test]
@@ -617,6 +737,51 @@ fn blocking_client_refreshes_findmy_devices() {
         .expect("refresh should succeed");
     assert_eq!(devices.devices.len(), 1);
     assert_eq!(devices.devices[0].id, "device-1");
+}
+
+#[test]
+fn blocking_client_handles_legacy_two_step_device_flow() {
+    let transport = MockBlockingTransport::with_responses(vec![
+        legacy_trusted_devices_response(),
+        ResponseParts::new(
+            StatusCode::OK,
+            HeaderMap::new(),
+            br#"{"success":true}"#.to_vec(),
+        ),
+        ResponseParts::new(StatusCode::OK, HeaderMap::new(), Vec::new()),
+        account_login_response(),
+    ]);
+    let mut client = authenticated_client_with_transport(transport.clone());
+
+    let devices = client
+        .legacy_trusted_devices()
+        .expect("trusted devices should load");
+    assert_eq!(devices.len(), 2);
+    assert_eq!(devices[0].display_label(), Some("MacBook Pro"));
+    assert!(
+        client
+            .request_legacy_verification_code(&devices[0])
+            .expect("legacy request should succeed")
+    );
+    client
+        .submit_legacy_verification_code(&devices[0], "123456")
+        .expect("legacy submit should succeed");
+
+    let requests = transport.requests.lock().expect("requests mutex");
+    assert_eq!(
+        requests[0].url.as_str(),
+        "https://setup.icloud.com/setup/ws/1/listDevices?dsid=123456789",
+    );
+    assert_eq!(
+        String::from_utf8(requests[1].body.as_bytes().expect("json body").to_vec())
+            .expect("utf8 body"),
+        r#"{"deviceName":"MacBook Pro","id":"device-1"}"#,
+    );
+    assert_eq!(
+        String::from_utf8(requests[2].body.as_bytes().expect("json body").to_vec())
+            .expect("utf8 body"),
+        r#"{"deviceName":"MacBook Pro","id":"device-1","trustBrowser":true,"verificationCode":"123456"}"#,
+    );
 }
 
 #[test]

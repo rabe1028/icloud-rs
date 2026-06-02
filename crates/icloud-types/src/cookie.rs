@@ -8,10 +8,14 @@ use url::Url;
 
 use crate::ICloudError;
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
 #[cfg(feature = "std")]
 use http::{HeaderMap, header::SET_COOKIE};
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct CookieIdentity {
     pub domain: String,
     pub path: String,
@@ -43,6 +47,7 @@ impl Ord for CookieIdentity {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct StoredCookie {
     pub identity: CookieIdentity,
     pub value: String,
@@ -52,14 +57,48 @@ pub struct StoredCookie {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct CookiePair {
     pub name: String,
     pub value: String,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct CookieJar {
+    #[cfg_attr(feature = "serde", serde(with = "cookie_map_serde"))]
     cookies: BTreeMap<CookieIdentity, StoredCookie>,
+}
+
+#[cfg(feature = "serde")]
+mod cookie_map_serde {
+    use alloc::{collections::BTreeMap, vec::Vec};
+
+    use serde::{Deserialize, Serialize, Serializer, de::Deserializer};
+
+    use super::{CookieIdentity, StoredCookie};
+
+    pub(crate) fn serialize<S>(
+        cookies: &BTreeMap<CookieIdentity, StoredCookie>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        cookies.values().collect::<Vec<_>>().serialize(serializer)
+    }
+
+    pub(crate) fn deserialize<'de, D>(
+        deserializer: D,
+    ) -> Result<BTreeMap<CookieIdentity, StoredCookie>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Ok(Vec::<StoredCookie>::deserialize(deserializer)?
+            .into_iter()
+            .map(|cookie| (cookie.identity.clone(), cookie))
+            .collect())
+    }
 }
 
 impl CookieJar {

@@ -107,6 +107,7 @@ fn reqwest_method(method: Method) -> http::Method {
     match method {
         Method::Get => http::Method::GET,
         Method::Post => http::Method::POST,
+        Method::Put => http::Method::PUT,
     }
 }
 

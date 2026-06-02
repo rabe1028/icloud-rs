@@ -91,6 +91,43 @@ pub(crate) fn quote(value: &str) -> String {
     out
 }
 
+pub(crate) fn render_value(value: &JsonValue) -> String {
+    match value {
+        JsonValue::Null => "null".to_owned(),
+        JsonValue::Bool(value) => {
+            if *value {
+                "true".to_owned()
+            } else {
+                "false".to_owned()
+            }
+        }
+        JsonValue::Number(value) => value.as_str().to_owned(),
+        JsonValue::String(value) => quote(value),
+        JsonValue::Array(values) => {
+            format!(
+                "[{}]",
+                values
+                    .iter()
+                    .map(render_value)
+                    .collect::<Vec<_>>()
+                    .join(",")
+            )
+        }
+        JsonValue::Object(values) => render_object(values),
+    }
+}
+
+pub(crate) fn render_object(value: &JsonObject) -> String {
+    format!(
+        "{{{}}}",
+        value
+            .iter()
+            .map(|(name, value)| member(name, render_value(value)))
+            .collect::<Vec<_>>()
+            .join(",")
+    )
+}
+
 pub(crate) fn member(name: &str, value: impl AsRef<str>) -> String {
     format!("{}:{}", quote(name), value.as_ref())
 }

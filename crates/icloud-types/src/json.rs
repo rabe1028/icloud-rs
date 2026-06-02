@@ -3,11 +3,15 @@ use crate::prelude::*;
 use alloc::collections::BTreeMap;
 use nojson::{JsonParseError, JsonValueKind, RawJsonOwned, RawJsonValue};
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
 pub type JsonObject = BTreeMap<String, JsonValue>;
 pub type RawJson = RawJsonOwned;
 static NULL: JsonValue = JsonValue::Null;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum JsonValue {
     Null,
     Bool(bool),
@@ -23,6 +27,7 @@ pub enum JsonValue {
 /// up front. The `as_*` accessors parse that string on every call, so callers
 /// that read the same number repeatedly should cache the result.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct JsonNumber(String);
 
 impl JsonNumber {

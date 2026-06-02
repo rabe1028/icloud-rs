@@ -39,7 +39,7 @@ pub use account::{
 };
 pub use auth::{
     AuthProtocol, SignInOutcome, parse_account_bootstrap, parse_challenge_headers,
-    parse_session_seed, parse_sign_in_response,
+    parse_legacy_trusted_devices, parse_session_seed, parse_sign_in_response,
 };
 pub use calendar::{CalendarProtocol, parse_calendar_event_detail, parse_calendar_events};
 pub use contacts::{ContactsProtocol, parse_contacts_page, parse_contacts_startup};
@@ -55,8 +55,8 @@ pub use photos::{
 };
 pub use reminders::{RemindersProtocol, parse_reminders};
 pub use request::{
-    HeaderMap, HeaderName, HeaderValue, Method, RequestBody, RequestSpec, ResponseParts,
-    StatusCode, header,
+    HeaderMap, HeaderName, HeaderValue, HeaderValueError, Method, RequestBody, RequestSpec,
+    ResponseParts, StatusCode, header,
 };
 pub use ubiquity::{
     UbiquityProtocol, parse_ubiquity_children, parse_ubiquity_folder, parse_ubiquity_node,

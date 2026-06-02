@@ -6,10 +6,11 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 version.workspace = true
-include = ["Cargo.toml", "src/**/*", "tests/**/*"]
+include = ["Cargo.toml", "src/**/*", "tests/**/*", "examples/**/*"]
 
 [features]
 default = []
+serde = ["icloud-protocol/serde", "icloud-types/serde"]
 reqwest-async = ["dep:reqwest", "reqwest/http2", "reqwest/rustls-tls"]
 reqwest-blocking = [
   "dep:reqwest",
@@ -30,7 +31,16 @@ url.workspace = true
 
 [dev-dependencies]
 pretty_assertions.workspace = true
+serde_json.workspace = true
 tokio.workspace = true
+
+[[example]]
+name = "auth_flow"
+required-features = ["reqwest-blocking", "serde"]
+
+[[example]]
+name = "custom_transport"
+required-features = ["serde"]
 
 [lints]
 workspace = true
