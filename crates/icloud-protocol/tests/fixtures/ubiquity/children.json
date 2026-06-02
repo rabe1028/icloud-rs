@@ -1,0 +1,25 @@
+{
+  "item_list": [
+    {
+      "item_id": "documents-folder",
+      "name": "Documents",
+      "type": "folder",
+      "size": "0",
+      "modified": "2020-05-03T00:10:00Z"
+    },
+    {
+      "item_id": "notes-file",
+      "name": "notes.txt",
+      "type": "file",
+      "size": "12",
+      "modified": "2020-05-03T00:12:00Z"
+    },
+    {
+      "item_id": "corrupt-file",
+      "name": "corrupt.bin",
+      "type": "file",
+      "size": "NaN",
+      "modified": "2020-05-03T00:13:00Z"
+    }
+  ]
+}

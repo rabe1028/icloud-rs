@@ -1,0 +1,29 @@
+{
+  "storageUsageInfo": {
+    "compStorageInBytes": 0,
+    "usedStorageInBytes": 5368709120,
+    "totalStorageInBytes": 21474836480,
+    "commerceStorageInBytes": 1073741824
+  },
+  "quotaStatus": {
+    "overQuota": false,
+    "haveMaxQuotaTier": false,
+    "almost-full": false,
+    "paidQuota": true
+  },
+  "storageUsageByMedia": [
+    {
+      "mediaKey": "drive",
+      "displayLabel": "iCloud Drive",
+      "displayColor": "#007AFF",
+      "usageInBytes": 3221225472
+    },
+    {
+      "mediaKey": "photos",
+      "displayLabel": "Photos",
+      "displayColor": "#FF9500",
+      "usageInBytes": 2147483648
+    }
+  ],
+  "status": "ok"
+}

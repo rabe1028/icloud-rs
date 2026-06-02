@@ -1,0 +1,19 @@
+{
+  "records": [
+    {
+      "recordName": "folder-child-1",
+      "recordType": "CPLAlbumByPositionLive",
+      "fields": {
+        "albumNameEnc": {
+          "value": "TmVzdGVkIFZhY2F0aW9u"
+        },
+        "sortAscending": {
+          "value": true
+        },
+        "isDeleted": {
+          "value": false
+        }
+      }
+    }
+  ]
+}

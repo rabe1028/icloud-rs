@@ -1,0 +1,46 @@
+{
+  "accountName": "person@example.com",
+  "dsInfo": {
+    "dsid": "123456789"
+  },
+  "hsaChallengeRequired": false,
+  "isTrustedBrowser": true,
+  "webservices": {
+    "findme": {
+      "status": "active",
+      "url": "https://p43-fmip.icloud.com/"
+    },
+    "ckdatabasews": {
+      "status": "active",
+      "url": "https://p43-ckdatabasews.icloud.com/"
+    },
+    "contacts": {
+      "status": "active",
+      "url": "https://p43-contacts.icloud.com/"
+    },
+    "calendar": {
+      "status": "active",
+      "url": "https://p43-calendarws.icloud.com/"
+    },
+    "reminders": {
+      "status": "active",
+      "url": "https://p43-remindersws.icloud.com/"
+    },
+    "account": {
+      "status": "active",
+      "url": "https://p43-setup.icloud.com/"
+    },
+    "drivews": {
+      "status": "active",
+      "url": "https://p43-drivews.icloud.com/"
+    },
+    "docws": {
+      "status": "active",
+      "url": "https://p43-docws.icloud.com/"
+    },
+    "ubiquity": {
+      "status": "active",
+      "url": "https://p43-ubiquityws.icloud.com/"
+    }
+  }
+}

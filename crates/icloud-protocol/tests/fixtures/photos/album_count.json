@@ -1,0 +1,17 @@
+{
+  "batch": [
+    {
+      "records": [
+        {
+          "recordName": "count-1",
+          "recordType": "TotalCount",
+          "fields": {
+            "itemCount": {
+              "value": 2
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

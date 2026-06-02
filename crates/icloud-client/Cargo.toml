@@ -1,0 +1,36 @@
+[package]
+name = "icloud-client"
+description = "High-level async and blocking clients for icloud-rs"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+include = ["Cargo.toml", "src/**/*", "tests/**/*"]
+
+[features]
+default = []
+reqwest-async = ["dep:reqwest", "reqwest/http2", "reqwest/rustls-tls"]
+reqwest-blocking = [
+  "dep:reqwest",
+  "reqwest/blocking",
+  "reqwest/http2",
+  "reqwest/rustls-tls",
+]
+
+[dependencies]
+http.workspace = true
+icloud-protocol = { path = "../icloud-protocol", version = "0.1.8", features = ["std"] }
+icloud-types = { path = "../icloud-types", version = "0.1.8", features = ["std"] }
+reqwest = { workspace = true, optional = true }
+secrecy.workspace = true
+thiserror.workspace = true
+time = { workspace = true, features = ["formatting", "std"] }
+url.workspace = true
+
+[dev-dependencies]
+pretty_assertions.workspace = true
+tokio.workspace = true
+
+[lints]
+workspace = true

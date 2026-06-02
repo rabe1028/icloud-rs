@@ -1,0 +1,36 @@
+[package]
+name = "icloud-protocol"
+description = "Sans-IO request builders and parsers for icloud-rs"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+include = ["Cargo.toml", "src/**/*", "tests/**/*"]
+
+[features]
+default = ["std"]
+std = [
+  "icloud-types/std",
+  "nojson/std",
+  "time/formatting",
+  "time/std",
+  "url/std",
+  "dep:uuid",
+  "uuid/std",
+]
+
+[dependencies]
+base64.workspace = true
+icloud-types = { path = "../icloud-types", version = "0.1.8", default-features = false }
+nojson.workspace = true
+secrecy.workspace = true
+time.workspace = true
+url.workspace = true
+uuid = { workspace = true, optional = true }
+
+[dev-dependencies]
+pretty_assertions.workspace = true
+
+[lints]
+workspace = true

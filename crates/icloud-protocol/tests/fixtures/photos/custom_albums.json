@@ -1,0 +1,67 @@
+{
+  "records": [
+    {
+      "recordName": "----Root-Folder----",
+      "recordType": "CPLAlbumByPositionLive",
+      "fields": {
+        "albumNameEnc": {
+          "value": "Um9vdA=="
+        },
+        "isDeleted": {
+          "value": false
+        }
+      }
+    },
+    {
+      "recordName": "deleted-folder",
+      "recordType": "CPLAlbumByPositionLive",
+      "fields": {
+        "albumNameEnc": {
+          "value": "RGVsZXRlZA=="
+        },
+        "isDeleted": {
+          "value": true
+        }
+      }
+    },
+    {
+      "recordName": "nameless-folder",
+      "recordType": "CPLAlbumByPositionLive",
+      "fields": {
+        "isDeleted": {
+          "value": false
+        }
+      }
+    },
+    {
+      "recordName": "folder-container",
+      "recordType": "CPLAlbumByPositionLive",
+      "fields": {
+        "albumNameEnc": {
+          "value": "VHJpcHM="
+        },
+        "albumType": {
+          "value": 3
+        },
+        "isDeleted": {
+          "value": false
+        }
+      }
+    },
+    {
+      "recordName": "folder-1",
+      "recordType": "CPLAlbumByPositionLive",
+      "fields": {
+        "albumNameEnc": {
+          "value": "VmFjYXRpb24="
+        },
+        "sortAscending": {
+          "value": false
+        },
+        "isDeleted": {
+          "value": false
+        }
+      }
+    }
+  ]
+}

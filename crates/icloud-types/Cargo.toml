@@ -1,0 +1,37 @@
+[package]
+name = "icloud-types"
+description = "Shared domain types for icloud-rs"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+include = ["Cargo.toml", "src/**/*"]
+
+[features]
+default = ["std"]
+std = [
+  "nojson/std",
+  "thiserror/std",
+  "time/formatting",
+  "time/std",
+  "url/std",
+  "dep:http",
+  "http/std",
+  "dep:uuid",
+  "dep:cookie",
+  "uuid/std",
+]
+
+[dependencies]
+cookie = { workspace = true, optional = true }
+http = { workspace = true, optional = true }
+nojson.workspace = true
+secrecy.workspace = true
+thiserror.workspace = true
+time.workspace = true
+url.workspace = true
+uuid = { workspace = true, optional = true }
+
+[lints]
+workspace = true

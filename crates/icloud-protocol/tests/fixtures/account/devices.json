@@ -1,0 +1,16 @@
+{
+  "devices": [
+    {
+      "name": "Rabe's MacBook Pro",
+      "modelDisplayName": "MacBook Pro",
+      "deviceClass": "Mac",
+      "serialNumber": "C02TESTMAC"
+    },
+    {
+      "name": "Rabe's iPhone",
+      "modelDisplayName": "iPhone 15 Pro",
+      "deviceClass": "iPhone",
+      "serialNumber": "F2LTESTPHONE"
+    }
+  ]
+}

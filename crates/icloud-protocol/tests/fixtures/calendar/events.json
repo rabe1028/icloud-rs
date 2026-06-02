@@ -1,0 +1,24 @@
+{
+  "Event": [
+    {
+      "eventGuid": "event-1",
+      "title": "Team sync",
+      "startDate": 1717236000000,
+      "endDate": 1717239600000,
+      "allDay": false,
+      "location": "Room A",
+      "calendarName": "Work",
+      "calendarGuid": "calendar-1"
+    },
+    {
+      "guid": "event-2",
+      "summary": "Holiday",
+      "startDate": "2024-06-02T00:00:00Z",
+      "endDate": "2024-06-03T00:00:00Z",
+      "allDay": true,
+      "calendarTitle": "Home",
+      "description": "Out of office"
+    }
+  ],
+  "today": "2024-06-01"
+}

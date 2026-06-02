@@ -1,0 +1,39 @@
+{
+  "syncToken": "sync-token-1",
+  "contacts": [
+    {
+      "contactId": "contact-1",
+      "firstName": "Ada",
+      "lastName": "Lovelace",
+      "displayName": "Ada Lovelace",
+      "emails": [
+        {
+          "label": "work",
+          "value": "ada@example.com"
+        }
+      ],
+      "phones": [
+        {
+          "label": "mobile",
+          "value": "+44-20-0000-0001"
+        }
+      ]
+    },
+    {
+      "identifier": "contact-2",
+      "companyName": "Analytical Engines",
+      "emailAddresses": [
+        {
+          "type": "work",
+          "address": "engines@example.com"
+        }
+      ],
+      "phoneNumbers": [
+        {
+          "type": "main",
+          "number": "+1-555-0100"
+        }
+      ]
+    }
+  ]
+}

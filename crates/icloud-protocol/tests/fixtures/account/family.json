@@ -1,0 +1,28 @@
+{
+  "familyMembers": [
+    {
+      "dsid": "member-1",
+      "fullName": "Ada Lovelace",
+      "firstName": "Ada",
+      "lastName": "Lovelace",
+      "familyId": "family-1",
+      "ageClassification": "ADULT",
+      "hasParentalPrivileges": true,
+      "hasShareMyLocationEnabled": true,
+      "shareMyLocationEnabledFamilyMembers": [
+        "member-2"
+      ]
+    },
+    {
+      "dsid": "member-2",
+      "fullName": "Charles Babbage",
+      "firstName": "Charles",
+      "lastName": "Babbage",
+      "familyId": "family-1",
+      "ageClassification": "ADULT",
+      "hasAskToBuyEnabled": false,
+      "hasScreenTimeEnabled": false,
+      "hasSharePurchasesEnabled": true
+    }
+  ]
+}

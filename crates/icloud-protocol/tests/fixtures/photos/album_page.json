@@ -1,0 +1,175 @@
+{
+  "records": [
+    {
+      "recordName": "master-photo-1",
+      "recordType": "CPLMaster",
+      "recordChangeTag": "master-tag-1",
+      "fields": {
+        "filenameEnc": {
+          "value": "SU1HXzAwMDEuSlBH"
+        },
+        "resOriginalWidth": {
+          "value": 4032
+        },
+        "resOriginalHeight": {
+          "value": 3024
+        },
+        "resOriginalFileType": {
+          "value": "public.jpeg"
+        },
+        "resOriginalRes": {
+          "value": {
+            "size": 456789,
+            "downloadURL": "https://cvws.icloud.com/original/1"
+          }
+        },
+        "resJPEGMedWidth": {
+          "value": 1024
+        },
+        "resJPEGMedHeight": {
+          "value": 768
+        },
+        "resJPEGMedFileType": {
+          "value": "public.jpeg"
+        },
+        "resJPEGMedRes": {
+          "value": {
+            "size": 12345,
+            "downloadURL": "https://cvws.icloud.com/medium/1"
+          }
+        },
+        "resJPEGThumbWidth": {
+          "value": 240
+        },
+        "resJPEGThumbHeight": {
+          "value": 180
+        },
+        "resJPEGThumbFileType": {
+          "value": "public.jpeg"
+        },
+        "resJPEGThumbRes": {
+          "value": {
+            "size": 4567,
+            "downloadURL": "https://cvws.icloud.com/thumb/1"
+          }
+        }
+      }
+    },
+    {
+      "recordName": "asset-photo-1",
+      "recordType": "CPLAsset",
+      "recordChangeTag": "asset-tag-1",
+      "fields": {
+        "masterRef": {
+          "value": {
+            "recordName": "master-photo-1",
+            "zoneID": {
+              "zoneName": "PrimarySync"
+            }
+          }
+        },
+        "assetDate": {
+          "value": 1712730301000
+        },
+        "addedDate": {
+          "value": 1712816701000
+        }
+      }
+    },
+    {
+      "recordName": "master-video-1",
+      "recordType": "CPLMaster",
+      "recordChangeTag": "master-tag-2",
+      "fields": {
+        "filenameEnc": {
+          "value": "bW92aWUubW92"
+        },
+        "resOriginalWidth": {
+          "value": 1920
+        },
+        "resOriginalHeight": {
+          "value": 1080
+        },
+        "resOriginalFileType": {
+          "value": "com.apple.quicktime-movie"
+        },
+        "resOriginalRes": {
+          "value": {
+            "size": 2048,
+            "downloadURL": "https://cvws.icloud.com/original/video-1"
+          }
+        },
+        "resVidMedWidth": {
+          "value": 1280
+        },
+        "resVidMedHeight": {
+          "value": 720
+        },
+        "resVidMedFileType": {
+          "value": "com.apple.quicktime-movie"
+        },
+        "resVidMedRes": {
+          "value": {
+            "size": 1024,
+            "downloadURL": "https://cvws.icloud.com/medium/video-1"
+          }
+        },
+        "resVidSmallWidth": {
+          "value": 480
+        },
+        "resVidSmallHeight": {
+          "value": 270
+        },
+        "resVidSmallFileType": {
+          "value": "com.apple.quicktime-movie"
+        },
+        "resVidSmallRes": {
+          "value": {
+            "size": 256,
+            "downloadURL": "https://cvws.icloud.com/thumb/video-1"
+          }
+        }
+      }
+    },
+    {
+      "recordName": "asset-video-1",
+      "recordType": "CPLAsset",
+      "recordChangeTag": "asset-tag-2",
+      "fields": {
+        "masterRef": {
+          "value": {
+            "recordName": "master-video-1",
+            "zoneID": {
+              "zoneName": "PrimarySync"
+            }
+          }
+        },
+        "addedDate": {
+          "value": 1712903101000
+        }
+      }
+    },
+    {
+      "recordName": "master-orphan",
+      "recordType": "CPLMaster",
+      "recordChangeTag": "master-tag-orphan",
+      "fields": {
+        "filenameEnc": {
+          "value": "SU1HXzAwMDEuSlBH"
+        },
+        "resOriginalWidth": {
+          "value": 1
+        },
+        "resOriginalHeight": {
+          "value": 1
+        },
+        "resOriginalRes": {
+          "value": {
+            "size": 1,
+            "downloadURL": "https://cvws.icloud.com/original/orphan"
+          }
+        }
+      }
+    }
+  ]
+}

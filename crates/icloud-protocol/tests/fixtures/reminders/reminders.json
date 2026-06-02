@@ -1,0 +1,33 @@
+{
+  "Collections": [
+    {
+      "guid": "list-1",
+      "title": "Personal",
+      "color": "#34C759"
+    },
+    {
+      "guid": "list-2",
+      "title": "Work",
+      "color": "#007AFF"
+    }
+  ],
+  "Reminders": [
+    {
+      "guid": "task-1",
+      "title": "Buy milk",
+      "pGuid": "list-1",
+      "dueDate": [20240601, 2024, 6, 1, 12, 0],
+      "completed": false,
+      "priority": 5
+    },
+    {
+      "guid": "task-2",
+      "title": "Ship calendar parity",
+      "pGuid": "list-2",
+      "dueDate": [20240602, 2024, 6, 2, 12, 0],
+      "completed": true,
+      "description": "Merged after review"
+    }
+  ],
+  "syncToken": "reminders-sync-1"
+}

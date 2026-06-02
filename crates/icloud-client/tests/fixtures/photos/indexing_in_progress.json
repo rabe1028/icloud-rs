@@ -1,0 +1,13 @@
+{
+  "records": [
+    {
+      "recordName": "check-indexing-state",
+      "recordType": "CheckIndexingState",
+      "fields": {
+        "state": {
+          "value": "INDEXING"
+        }
+      }
+    }
+  ]
+}

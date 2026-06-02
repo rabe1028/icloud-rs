@@ -1,0 +1,25 @@
+{
+  "Event": {
+    "eventGuid": "event-1",
+    "title": "Team sync",
+    "startDate": 1717236000000,
+    "endDate": 1717239600000,
+    "location": "Room A",
+    "notes": "Bring status updates",
+    "calendarName": "Work",
+    "calendarGuid": "calendar-1"
+  },
+  "attendees": [
+    {
+      "name": "Ada Lovelace",
+      "email": "ada@example.com",
+      "status": "ACCEPTED"
+    },
+    {
+      "commonName": "Grace Hopper",
+      "emailAddress": "grace@example.com",
+      "participationStatus": "PENDING"
+    }
+  ],
+  "status": "OK"
+}

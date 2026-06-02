@@ -1,0 +1,26 @@
+{
+  "content": [
+    {
+      "id": "device-1",
+      "name": "Rabe's iPhone",
+      "deviceDisplayName": "iPhone 15 Pro",
+      "modelDisplayName": "iPhone",
+      "rawDeviceModel": "iPhone16,1",
+      "deviceStatus": 200,
+      "batteryLevel": 0.76,
+      "batteryStatus": "Charging",
+      "locationEnabled": true,
+      "locationCapable": true,
+      "lostModeEnabled": false,
+      "thisDevice": true,
+      "isMac": false,
+      "location": {
+        "latitude": 35.681236,
+        "longitude": 139.767125,
+        "horizontalAccuracy": 17.5,
+        "positionType": "GPS",
+        "timeStamp": 1717060200000
+      }
+    }
+  ]
+}
