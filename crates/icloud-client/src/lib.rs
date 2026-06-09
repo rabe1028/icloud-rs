@@ -374,6 +374,19 @@ where
         Ok(())
     }
 
+    pub $($a)* fn request_trusted_device_code(
+        &mut self,
+    ) -> Result<(), ClientError<T::Error>> {
+        let request = {
+            let protocol = AuthProtocol::new(&self.core.context, &self.core.identity);
+            protocol.request_trusted_device_code(&self.core.state.pending)?
+        };
+        let response = $exec(&mut self.core, request) $($w)* ?;
+        response.ensure_success()?;
+        merge_pending_two_factor_response(&mut self.core.state.pending, &response)?;
+        Ok(())
+    }
+
     pub $($a)* fn submit_trusted_device_code(
         mut self,
         code: &str,

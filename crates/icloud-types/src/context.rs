@@ -26,6 +26,14 @@ impl EndpointSet {
             home_endpoint: Url::parse("https://www.icloud.com")?,
         })
     }
+
+    pub fn china_mainland() -> Result<Self, ICloudError> {
+        Ok(Self {
+            auth_endpoint: Url::parse("https://idmsa.apple.com.cn/appleauth/auth/")?,
+            setup_endpoint: Url::parse("https://setup.icloud.com.cn/setup/ws/1/")?,
+            home_endpoint: Url::parse("https://www.icloud.com.cn")?,
+        })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -46,12 +54,20 @@ pub struct ClientProfile {
 impl ClientProfile {
     pub fn pyicloud(widget_key: impl Into<String>) -> Result<Self, ICloudError> {
         let origin = Url::parse("https://www.icloud.com")?;
+        Self::pyicloud_with_origin(widget_key, origin)
+    }
+
+    pub fn pyicloud_with_origin(
+        widget_key: impl Into<String>,
+        origin: Url,
+    ) -> Result<Self, ICloudError> {
+        let oauth_redirect_uri = Url::parse("https://www.icloud.com")?;
         Ok(Self {
             widget_key: widget_key.into(),
             oauth_client_id: "d39ba9916b7251055b22c7f910e2ea796ee65e98b2ddecea8f5dde8d9d1a815d"
                 .to_owned(),
             oauth_client_type: "firstPartyAuth".to_owned(),
-            oauth_redirect_uri: origin.clone(),
+            oauth_redirect_uri,
             oauth_require_grant_code: true,
             oauth_response_mode: "web_message".to_owned(),
             oauth_response_type: "code".to_owned(),
@@ -71,9 +87,21 @@ pub struct ClientContext {
 
 impl ClientContext {
     pub fn production(widget_key: impl Into<String>) -> Result<Self, ICloudError> {
+        Self::from_endpoints(widget_key, EndpointSet::production()?)
+    }
+
+    pub fn china_mainland(widget_key: impl Into<String>) -> Result<Self, ICloudError> {
+        Self::from_endpoints(widget_key, EndpointSet::china_mainland()?)
+    }
+
+    pub fn from_endpoints(
+        widget_key: impl Into<String>,
+        endpoints: EndpointSet,
+    ) -> Result<Self, ICloudError> {
+        let origin = endpoints.home_endpoint.clone();
         Ok(Self {
-            endpoints: EndpointSet::production()?,
-            profile: ClientProfile::pyicloud(widget_key)?,
+            endpoints,
+            profile: ClientProfile::pyicloud_with_origin(widget_key, origin)?,
         })
     }
 
@@ -135,4 +163,51 @@ fn random_client_id_suffix() -> String {
 fn join_path(base: &Url, path: &str) -> Result<Url, ICloudError> {
     let normalized = path.trim_start_matches('/');
     Ok(base.join(normalized)?)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn production_context_matches_pyicloud_default_endpoints() {
+        let context = ClientContext::production("widget-key").expect("context");
+
+        assert_eq!(
+            context.endpoints.auth_endpoint.as_str(),
+            "https://idmsa.apple.com/appleauth/auth/"
+        );
+        assert_eq!(
+            context.endpoints.setup_endpoint.as_str(),
+            "https://setup.icloud.com/setup/ws/1/"
+        );
+        assert_eq!(context.profile.origin.as_str(), "https://www.icloud.com/");
+        assert_eq!(context.profile.referer.as_str(), "https://www.icloud.com/");
+    }
+
+    #[test]
+    fn china_mainland_context_matches_pyicloud_endpoint_suffixes() {
+        let context = ClientContext::china_mainland("widget-key").expect("context");
+
+        assert_eq!(
+            context.endpoints.auth_endpoint.as_str(),
+            "https://idmsa.apple.com.cn/appleauth/auth/"
+        );
+        assert_eq!(
+            context.endpoints.setup_endpoint.as_str(),
+            "https://setup.icloud.com.cn/setup/ws/1/"
+        );
+        assert_eq!(
+            context.profile.origin.as_str(),
+            "https://www.icloud.com.cn/"
+        );
+        assert_eq!(
+            context.profile.oauth_redirect_uri.as_str(),
+            "https://www.icloud.com/"
+        );
+        assert_eq!(
+            context.profile.referer.as_str(),
+            "https://www.icloud.com.cn/"
+        );
+    }
 }

@@ -156,6 +156,24 @@ fn trusted_device_verify_response_with_rotated_challenge() -> ResponseParts {
     ResponseParts::new(StatusCode::OK, headers, Vec::new())
 }
 
+fn trusted_device_request_response() -> ResponseParts {
+    let mut headers = HeaderMap::new();
+    headers.insert("scnt", HeaderValue::from_static("requested-scnt"));
+    headers.insert(
+        "x-apple-id-session-id",
+        HeaderValue::from_static("requested-session-id"),
+    );
+    headers.insert(
+        "x-apple-session-token",
+        HeaderValue::from_static("session-token"),
+    );
+    headers.insert(
+        "x-apple-id-account-country",
+        HeaderValue::from_static("JPN"),
+    );
+    ResponseParts::new(StatusCode::OK, headers, Vec::new())
+}
+
 fn authenticated_sign_in_response_without_trust_header() -> ResponseParts {
     let mut headers = HeaderMap::new();
     headers.insert(
@@ -496,6 +514,57 @@ fn blocking_client_completes_sms_two_factor_flow() {
         String::from_utf8(requests[2].body.as_bytes().expect("json body").to_vec())
             .expect("utf8 body"),
         r#"{"phoneNumber":{"id":7,"nonFTEU":false},"securityCode":{"code":"123456"},"mode":"sms"}"#,
+    );
+}
+
+#[test]
+fn blocking_client_requests_trusted_device_code_without_body() {
+    let transport = MockBlockingTransport::with_responses(vec![
+        pending_sign_in_response(),
+        trusted_device_request_response(),
+    ]);
+    let client = BlockingICloudClient::new(
+        context(),
+        ClientIdentity::new("auth-test-client"),
+        transport.clone(),
+    );
+
+    let mut pending = match client.sign_in(&credentials()).expect("sign in succeeds") {
+        BlockingSignInResult::PendingTwoFactor(client) => client,
+        BlockingSignInResult::Authenticated(_) => panic!("challenge expected"),
+    };
+
+    pending
+        .request_trusted_device_code()
+        .expect("trusted-device push request succeeds");
+
+    assert_eq!(
+        pending.state().pending.challenge,
+        icloud_types::ChallengeHeaders {
+            scnt: SecretString::from("requested-scnt".to_owned()),
+            session_id: "requested-session-id".to_owned(),
+        },
+    );
+
+    let requests = transport.requests.lock().expect("requests mutex");
+    assert_eq!(requests[1].method, icloud_protocol::Method::Put);
+    assert_eq!(
+        requests[1].url.as_str(),
+        "https://idmsa.apple.com/appleauth/auth/verify/trusteddevice/securitycode"
+    );
+    assert!(
+        requests[1]
+            .body
+            .as_bytes()
+            .is_none_or(|body| body.is_empty()),
+        "trusted-device code requests must not send a body"
+    );
+    assert_eq!(
+        requests[1]
+            .headers
+            .get("scnt")
+            .and_then(|value| value.to_str().ok()),
+        Some("challenge-scnt")
     );
 }
 

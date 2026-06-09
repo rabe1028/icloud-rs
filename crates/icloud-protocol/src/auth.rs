@@ -114,6 +114,19 @@ impl<'a> AuthProtocol<'a> {
         Ok(request)
     }
 
+    pub fn request_trusted_device_code(
+        &self,
+        pending: &PendingTwoFactorAuth,
+    ) -> Result<RequestSpec, ICloudError> {
+        let mut request = RequestSpec::new(
+            Method::Put,
+            self.context.auth_url("verify/trusteddevice/securitycode")?,
+        );
+        request.headers = self.auth_headers()?;
+        add_challenge_headers(&mut request.headers, &pending.challenge)?;
+        Ok(request)
+    }
+
     pub fn verify_sms_code(
         &self,
         pending: &PendingTwoFactorAuth,
@@ -638,6 +651,43 @@ mod tests {
     }
 
     #[test]
+    fn china_mainland_sign_in_keeps_pyicloud_oauth_redirect_uri() {
+        let context = ClientContext::china_mainland(
+            "d39ba9916b7251055b22c7f910e2ea796ee65e98b2ddecea8f5dde8d9d1a815d",
+        )
+        .expect("china mainland context");
+        let identity = identity();
+        let protocol = AuthProtocol::new(&context, &identity);
+        let credentials = Credentials::new(
+            "person@example.com",
+            secrecy::SecretString::from("top-secret".to_owned()),
+        );
+
+        let request = protocol
+            .sign_in(&credentials, None)
+            .expect("request should be built");
+
+        assert_eq!(
+            request.url.as_str(),
+            "https://idmsa.apple.com.cn/appleauth/auth/signin?isRememberMeEnabled=true"
+        );
+        assert_eq!(
+            request
+                .headers
+                .get(ORIGIN)
+                .and_then(|value| value.to_str().ok()),
+            Some("https://www.icloud.com.cn"),
+        );
+        assert_eq!(
+            request
+                .headers
+                .get(HEADER_OAUTH_REDIRECT_URI)
+                .and_then(|value| value.to_str().ok()),
+            Some("https://www.icloud.com"),
+        );
+    }
+
+    #[test]
     fn sign_in_response_with_409_becomes_pending_two_factor() {
         let mut headers = HeaderMap::new();
         headers.insert(
@@ -782,6 +832,51 @@ mod tests {
             String::from_utf8(request.body.as_bytes().expect("json body").to_vec())
                 .expect("utf8 body"),
             r#"{"phoneNumber":{"id":7,"nonFTEU":false},"securityCode":{"code":"123456"},"mode":"sms"}"#,
+        );
+    }
+
+    #[test]
+    fn request_trusted_device_code_uses_expected_method_and_headers() {
+        let context = context();
+        let identity = identity();
+        let protocol = AuthProtocol::new(&context, &identity);
+        let pending = PendingTwoFactorAuth {
+            apple_id: "person@example.com".to_owned(),
+            challenge: ChallengeHeaders {
+                scnt: SecretString::from("challenge-scnt".to_owned()),
+                session_id: "session-id".to_owned(),
+            },
+            seed: SessionSeed::default(),
+            trusted_phone_numbers: Vec::new(),
+            has_trusted_devices: true,
+        };
+
+        let request = protocol
+            .request_trusted_device_code(&pending)
+            .expect("trusted-device request should build");
+
+        assert_eq!(request.method, Method::Put);
+        assert_eq!(
+            request.url.as_str(),
+            "https://idmsa.apple.com/appleauth/auth/verify/trusteddevice/securitycode"
+        );
+        assert!(
+            request.body.as_bytes().is_none_or(|body| body.is_empty()),
+            "trusted-device code requests must not send a body"
+        );
+        assert_eq!(
+            request
+                .headers
+                .get("scnt")
+                .and_then(|value| value.to_str().ok()),
+            Some("challenge-scnt")
+        );
+        assert_eq!(
+            request
+                .headers
+                .get("x-apple-id-session-id")
+                .and_then(|value| value.to_str().ok()),
+            Some("session-id")
         );
     }
 
